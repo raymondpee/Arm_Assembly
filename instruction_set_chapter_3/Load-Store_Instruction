@@ -1,0 +1,154 @@
+-Single register transfer
+-Single register load store addressing modes
+-multiple-register transfer
+	-Stack operation
+-Swap instruction
+
+
+Load store instruction transfer data between memory and processor registers
+
+Single register transfer
+------------------------
+<LDR|STR>{<cond>}{B} Rd,addressing1
+
+Rd is destination register
+
+LDR
+STR
+LDRB
+STRB
+
+exp:
+
+; load register r0 with the contents of
+; the memory address pointed to by register
+; r1.
+;
+LDR r0, [r1] ; = LDR r0, [r1, #0]
+;
+; store the contents of register r0 to
+; the memory address pointed to by
+; register r1.
+;
+STR r0, [r1] ; = STR r0, [r1, #0]
+
+
+
+Single-Register Load-Store Addressing Modes
+-------------------------------------------
+
+							Base address
+Index method 			Data 			register 	Example
+Preindex with writeback 	mem[base + offset] 	base + offset 	LDR r0,[r1,#4]!
+Preindex 			mem[base + offset] 	base 		LDR r0,[r1,#4]
+Postindex 			mem[base] 		base + offset 	LDR r0,[r1],#4
+
+
+				Instruction 			r0 = 				r1+ =
+Preindex with writeback 	LDR r0,[r1,#0x4]! 		mem32[r1 + 0x4] 		0x4
+				LDR r0,[r1,r2]! 		mem32[r1+r2] 			r2
+				LDR r0,[r1,r2,LSR#0x4]! 	mem32[r1 + (r2 LSR 0x4)] 	(r2 LSR 0x4)
+
+Preindex 			LDR r0,[r1,#0x4] 		mem32[r1 + 0x4] 		not updated
+				LDR r0,[r1,r2] 			mem32[r1 + r2] 			not updated
+				LDR r0,[r1,-r2,LSR #0x4] 	mem32[r1-(r2 LSR 0x4)] 		not updated
+
+Postindex 			LDR r0,[r1],#0x4 		mem32[r1] 			0x4
+				LDR r0,[r1],r2 			mem32[r1] 			r2
+				LDR r0,[r1],r2,LSR #0x4 	mem32[r1] 			(r2 LSR 0x4)
+
+
+
+exp:
+
+PRE 	r0 = 0x00000000
+    	r1 = 0x00009000
+    	mem32[0x00009000] = 0x01010101 // update to new value
+    	mem32[0x00009004] = 0x02020202 // update to new value
+    	
+	LDR r0, [r1, #4]!
+Preindexing with writeback:
+
+POST(1) r0 = 0x02020202
+	r1 = 0x00009004
+	
+	LDR r0, [r1, #4]
+Preindexing:
+
+POST(2) r0 = 0x02020202
+	r1 = 0x00009000
+	
+	LDR r0, [r1], #4
+Postindexing:
+
+POST(3) r0 = 0x01010101
+	r1 = 0x00009004
+
+
+
+
+Multiple Register Transfer
+--------------------------
+
+
+<LDM|STM>{<cond>}<addressing mode> Rn{!},<registers>{ˆ}
+
+LDM load multiple registers {Rd}*N <- mem32[start address + 4*N] optional Rn updated
+STM save multiple registers {Rd}*N -> mem32[start address + 4*N] optional Rn updated
+
+Rn is base address, N is number of iteration
+
+Addressing
+mode 	Description 		Start address 	End address 	Rn!
+IA 	increment after 	Rn 		Rn + 4*N − 4 	Rn + 4*N
+IB 	increment before 	Rn + 4 		Rn + 4*N 	Rn + 4*N
+DA 	decrement after 	Rn − 4*N + 4 	Rn 		Rn − 4*N
+DB 	decrement before 	Rn − 4*N 	Rn − 4 		Rn − 4*N
+
+
+exp:
+
+In this example, register r0 is the base register Rn and is followed by !, indicating that the
+register is updated after the instruction is executed. You will notice within the load multiple
+instruction that the registers are not individually listed.
+
+PRE:	mem32[0x80018] = 0x03
+	mem32[0x80014] = 0x02
+	mem32[0x80010] = 0x01
+	r0 = 0x00080010
+	r1 = 0x00000000
+	r2 = 0x00000000
+	r3 = 0x00000000
+	LDMIA r0!, {r1-r3}
+
+POST 	r0 = 0x0008001c
+	r1 = 0x00000001
+	r2 = 0x00000002
+	r3 = 0x00000003
+
+
+exp:
+The STMIB instruction stores the values 7, 8, 9 to memory.
+We then corrupt register r1 to r3.
+The LDMDA reloads the original values and restores the base pointer r0.
+
+PRE 	r0 = 0x00009000
+	r1 = 0x00000009
+	r2 = 0x00000008
+	r3 = 0x00000007
+	STMIB r0!, {r1-r3}
+	MOV r1, #1
+	MOV r2, #2
+	MOV r3, #3
+
+PRE(2) 	r0 = 0x0000900c
+	r1 = 0x00000001
+	r2 = 0x00000002
+	r3 = 0x00000003
+	LDMDA r0!, {r1-r3}
+
+POST 	r0 = 0x00009000
+	r1 = 0x00000009
+	r2 = 0x00000008
+	r3 = 0x00000007
+
